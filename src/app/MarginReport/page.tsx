@@ -318,8 +318,12 @@ export default function Dashboard2Page() {
 
     const finalParams = {
       storeCodes: cleaned,
-      startDate: finalRange.formattedStart,
-      endDate: finalRange.formattedEnd,
+      startDate:
+        "formattedStart" in finalRange
+          ? finalRange.formattedStart
+          : finalRange.start,
+      endDate:
+        "formattedEnd" in finalRange ? finalRange.formattedEnd : finalRange.end,
     };
 
     if (toggleValue === 0) {

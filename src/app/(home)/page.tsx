@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 
 export default function HomePage() {
   const [user, setUser] = useState({
@@ -31,15 +32,19 @@ export default function HomePage() {
 
       {/* Header */}
       <div className="flex items-center gap-5 mb-10">
-        <img
+        <Image
           src={user.img}
-          alt="User"
-          className="w-14 h-14 rounded-full border border-gray-200 shadow-sm"
+          alt="User avatar"
+          width={56}
+          height={56}
+          className="w-14 h-14 rounded-full border border-gray-200 shadow-sm object-cover"
         />
+
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">
-            Welcome back, {user.name}
+            {`Welcome back, ${user.name}`}
           </h1>
+
           <p className="text-gray-500 mt-1">
             Your Magson Performance Dashboard
           </p>
@@ -50,7 +55,8 @@ export default function HomePage() {
       <div className="max-w-3xl text-[17px] leading-relaxed text-gray-600">
         Gain clarity across sales performance, category trends, store operations,
         and margin analytics — all in one minimal and powerful dashboard
-        experience.  
+        experience.
+        <br />
         Use the sidebar on the left to begin.
       </div>
 
@@ -86,7 +92,7 @@ export default function HomePage() {
       {/* Minimal CTA */}
       <div className="mt-16 bg-gray-50 border border-gray-200 rounded-xl p-8 text-center shadow-sm">
         <h2 className="text-xl font-medium text-gray-800 mb-2">
-          You're all set.
+          {`You're all set.`}
         </h2>
         <p className="text-gray-500">
           Choose a module from the sidebar to get started.

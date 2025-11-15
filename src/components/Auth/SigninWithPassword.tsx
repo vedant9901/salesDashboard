@@ -6,7 +6,7 @@ import InputGroup from "../FormElements/InputGroup";
 import { Checkbox } from "../FormElements/checkbox";
 
 interface Props {
-  onLogin: (data: { email: string; password: string }) => void;
+  onLogin?: (data: { email: string; password: string }) => void; // <-- made optional
   loading?: boolean;
 }
 
@@ -26,7 +26,7 @@ export default function SigninWithPassword({ onLogin, loading }: Props) {
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    onLogin({ email: data.email, password: data.password }); // ✅ call parent handler
+    onLogin?.({ email: data.email, password: data.password }); // <-- safe call
   };
 
   return (
@@ -80,7 +80,7 @@ export default function SigninWithPassword({ onLogin, loading }: Props) {
         <button
           type="submit"
           disabled={loading}
-          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-primary p-4 font-medium text-white transition hover:bg-opacity-90"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary p-4 font-medium text-white transition hover:bg-opacity-90"
         >
           {loading ? (
             <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-white border-t-transparent" />

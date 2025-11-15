@@ -6,48 +6,73 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { NAV_DATA } from "./data";
-import { ArrowLeftIcon, ChevronUp } from "./icons";
+import { ArrowLeftIcon } from "./icons";
 import { MenuItem } from "./menu-item";
 import { useSidebarContext } from "./sidebar-context";
 import { ChevronUpIcon } from "@/assets/icons";
 
-// ----------------------------------------
-// FILTER MENU USING MODULE PERMISSIONS
-// ----------------------------------------
-function filterByModules(navData: any[], userModules: number[]) {
+/* ------------------------------------------------------
+   TYPES FOR NAV DATA
+------------------------------------------------------ */
+interface NavSubItem {
+  title: string;
+  url: string;
+  moduleNumber?: number;
+}
+
+interface NavItem {
+  title: string;
+  icon: any;
+  url?: string;
+  moduleNumber?: number;
+  items?: NavSubItem[];
+}
+
+interface NavSection {
+  label: string;
+  items: NavItem[];
+}
+
+/* ------------------------------------------------------
+   FILTER NAV DATA BY USER MODULE PERMISSIONS
+------------------------------------------------------ */
+function filterByModules(navData: NavSection[], userModules: number[]): NavSection[] {
   return navData
     .map((section) => {
       const filteredItems = section.items
-        .map((item) => {
-          // Parent item restricted?
+        .map((item: NavItem | null): NavItem | null => {
+          if (!item) return null;
+
           if (item.moduleNumber && !userModules.includes(item.moduleNumber)) {
             return null;
           }
 
-          // Filter sub-items
           const allowedSubitems = (item.items || []).filter(
-            (sub: any) =>
-              !sub.moduleNumber || userModules.includes(sub.moduleNumber)
+            (sub) => !sub.moduleNumber || userModules.includes(sub.moduleNumber)
           );
 
           return { ...item, items: allowedSubitems };
         })
-        .filter(Boolean);
+        .filter(Boolean) as NavItem[];
 
       return { ...section, items: filteredItems };
     })
-    .filter((sec) => sec.items.length > 0);
+    .filter((s) => s.items.length > 0);
 }
 
+/* ------------------------------------------------------
+   SIDEBAR COMPONENT
+------------------------------------------------------ */
 export function Sidebar() {
   const pathname = usePathname();
-  const { setIsOpen, isOpen, isMobile, toggleSidebar } = useSidebarContext();
+  const { isOpen, isMobile, setIsOpen, toggleSidebar } = useSidebarContext();
+
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const [userModules, setUserModules] = useState<number[]>([]);
 
-  // ----------------------------------------
-  // LOAD MODULES FROM LOCAL STORAGE
-  // ----------------------------------------
+  /* ------------------------------------------------------
+     LOAD MODULE ACCESS FROM SESSION
+  ------------------------------------------------------ */
   useEffect(() => {
     try {
       const sessionStr = localStorage.getItem("session");
@@ -55,54 +80,64 @@ export function Sidebar() {
         const session = JSON.parse(sessionStr);
         setUserModules(session.modules || []);
       }
-    } catch (err) {
-      console.error("Invalid session");
+    } catch {
+      console.error("Invalid session in localStorage");
     }
   }, []);
 
-  // Apply filtering
-  const filteredData = filterByModules(NAV_DATA, userModules);
+  const filteredData = filterByModules(NAV_DATA as NavSection[], userModules);
 
+  /* ------------------------------------------------------
+     EXPAND CORRECT MENU BASED ON PATH
+  ------------------------------------------------------ */
   const toggleExpanded = (title: string) => {
     setExpandedItems((prev) => (prev.includes(title) ? [] : [title]));
   };
 
   useEffect(() => {
-    filteredData.some((section) => {
-      return section.items.some((item) => {
-        return item.items.some((subItem) => {
-          if (subItem.url === pathname) {
+    filteredData.some((section) =>
+      section.items.some((item) =>
+        item.items?.some((sub) => {
+          if (sub.url === pathname) {
             if (!expandedItems.includes(item.title)) {
               toggleExpanded(item.title);
             }
             return true;
           }
-        });
-      });
-    });
+        })
+      )
+    );
   }, [pathname, filteredData]);
 
+  /* ------------------------------------------------------
+     RENDER
+  ------------------------------------------------------ */
   return (
     <>
+      {/* MOBILE OVERLAY */}
       {isMobile && isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 transition-opacity duration-300"
+          className="fixed inset-0 z-40 bg-black/50"
           onClick={() => setIsOpen(false)}
-          aria-hidden="true"
         />
       )}
 
       <aside
         className={cn(
-          "max-w-[290px] overflow-hidden border-r border-gray-200 bg-white transition-[width] duration-200 ease-linear dark:border-gray-800 dark:bg-gray-dark",
+          "max-w-[290px] overflow-hidden border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-dark transition-all duration-200 ease-linear",
+
+          // Positioning
           isMobile ? "fixed bottom-0 top-0 z-50" : "sticky top-0 h-screen",
-          isOpen ? "w-full" : "w-0"
+
+          // Width Logic
+          isMobile ? (isOpen ? "w-full" : "w-0") : "w-[290px]"
         )}
         aria-label="Main navigation"
-        aria-hidden={!isOpen}
-        inert={!isOpen}
+        aria-hidden={isMobile ? !isOpen : false}
+        inert={isMobile && !isOpen} // 🔥 FIXED
       >
         <div className="flex h-full flex-col py-10 pl-[25px] pr-[7px]">
+          {/* HEADER (LOGO + CLOSE BTN) */}
           <div className="relative pr-4.5">
             <Link
               href={"/"}
@@ -115,15 +150,14 @@ export function Sidebar() {
             {isMobile && (
               <button
                 onClick={toggleSidebar}
-                className="absolute left-3/4 right-4.5 top-1/2 -translate-y-1/2 text-right"
+                className="absolute left-3/4 right-4.5 top-1/2 -translate-y-1/2"
               >
-                <span className="sr-only">Close Menu</span>
                 <ArrowLeftIcon className="ml-auto size-7" />
               </button>
             )}
           </div>
 
-          {/* Navigation */}
+          {/* NAV MENU */}
           <div className="custom-scrollbar mt-6 flex-1 overflow-y-auto pr-3 min-[850px]:mt-10">
             {filteredData.map((section) => (
               <div key={section.label} className="mb-6">
@@ -131,48 +165,37 @@ export function Sidebar() {
                   {section.label}
                 </h2>
 
-                <nav role="navigation" aria-label={section.label}>
+                <nav>
                   <ul className="space-y-2">
                     {section.items.map((item) => (
                       <li key={item.title}>
-                        {item.items.length ? (
+                        {/* HAS SUBMENU */}
+                        {item.items && item.items.length > 0 ? (
                           <div>
                             <MenuItem
-                              isActive={item.items.some(
-                                ({ url }) => url === pathname
-                              )}
+                              isActive={item.items.some((i) => i.url === pathname)}
                               onClick={() => toggleExpanded(item.title)}
                             >
-                              <item.icon
-                                className="size-6 shrink-0"
-                                aria-hidden="true"
-                              />
-
+                              <item.icon className="size-6 shrink-0" />
                               <span>{item.title}</span>
-
                               <ChevronUpIcon
                                 className={cn(
-                                  "ml-auto rotate-180 transition-transform duration-200",
-                                  expandedItems.includes(item.title) &&
-                                    "rotate-0"
+                                  "ml-auto rotate-180 transition-transform",
+                                  expandedItems.includes(item.title) && "rotate-0"
                                 )}
-                                aria-hidden="true"
                               />
                             </MenuItem>
 
                             {expandedItems.includes(item.title) && (
-                              <ul
-                                className="ml-9 mr-0 space-y-1.5 pb-[15px] pr-0 pt-2"
-                                role="menu"
-                              >
-                                {item.items.map((subItem) => (
-                                  <li key={subItem.title} role="none">
+                              <ul className="ml-9 space-y-1.5 pb-[15px] pt-2">
+                                {item.items.map((sub) => (
+                                  <li key={sub.title}>
                                     <MenuItem
                                       as="link"
-                                      href={subItem.url}
-                                      isActive={pathname === subItem.url}
+                                      href={sub.url}
+                                      isActive={pathname === sub.url}
                                     >
-                                      <span>{subItem.title}</span>
+                                      <span>{sub.title}</span>
                                     </MenuItem>
                                   </li>
                                 ))}
@@ -180,29 +203,16 @@ export function Sidebar() {
                             )}
                           </div>
                         ) : (
-                          (() => {
-                            const href =
-                              "url" in item
-                                ? item.url + ""
-                                : "/" +
-                                  item.title.toLowerCase().split(" ").join("-");
-
-                            return (
-                              <MenuItem
-                                className="flex items-center gap-3 py-3"
-                                as="link"
-                                href={href}
-                                isActive={pathname === href}
-                              >
-                                <item.icon
-                                  className="size-6 shrink-0"
-                                  aria-hidden="true"
-                                />
-
-                                <span>{item.title}</span>
-                              </MenuItem>
-                            );
-                          })()
+                          /* NO SUBMENU */
+                          <MenuItem
+                            as="link"
+                            href={item.url ?? "/"}
+                            isActive={pathname === item.url}
+                            className="flex items-center gap-3 py-3"
+                          >
+                            <item.icon className="size-6 shrink-0" />
+                            <span>{item.title}</span>
+                          </MenuItem>
                         )}
                       </li>
                     ))}

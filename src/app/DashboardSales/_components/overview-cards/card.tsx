@@ -2,7 +2,8 @@
 
 import { ArrowDownIcon, ArrowUpIcon } from "@/assets/icons";
 import { cn } from "@/lib/utils";
-import type { JSX, SVGProps } from "react";
+import type { JSX } from "react";
+import { IconType } from "react-icons"; // ✅ Import react-icon type
 
 type PropsType = {
   label: string;
@@ -10,7 +11,7 @@ type PropsType = {
     value: number | string | JSX.Element;
     growthRate: number;
   };
-  Icon?: (props: SVGProps<SVGSVGElement>) => JSX.Element; // optional
+  Icon?: IconType; // ✅ Accept react-icons now
 };
 
 export function OverviewCard({ label, data, Icon }: PropsType) {
@@ -18,12 +19,10 @@ export function OverviewCard({ label, data, Icon }: PropsType) {
 
   return (
     <div className="relative rounded-lg bg-white p-3 shadow-1 dark:bg-gray-dark">
-      {/* Icon + Label in one line */}
+      {/* Icon + Label */}
       <div className="flex items-center justify-between text-sm font-medium text-blue-400">
         <span className="flex items-center gap-1">
-          {Icon && (
-            <Icon className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-          )}
+          {Icon && <Icon className="h-4 w-4 text-gray-400 dark:text-gray-500" />}
           {label}
         </span>
       </div>
@@ -35,14 +34,15 @@ export function OverviewCard({ label, data, Icon }: PropsType) {
         </span>
       </div>
 
-      {/* Growth % */}
+      {/* Growth */}
       <div
         className={cn(
           "mt-1 flex items-center gap-1 text-xs font-medium",
-          isDecreasing ? "text-red" : "text-green",
+          isDecreasing ? "text-red" : "text-green"
         )}
       >
         {(Number(data.growthRate) || 0).toFixed(0)}%
+
         {isDecreasing ? (
           <ArrowDownIcon className="h-3 w-3" />
         ) : (

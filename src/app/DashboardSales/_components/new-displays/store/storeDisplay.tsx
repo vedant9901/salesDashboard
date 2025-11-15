@@ -11,21 +11,26 @@ export default function StoresPage() {
 
   const { items: stores, status: storesStatus, error: storesError } =
     useSelector((state: RootState) => state.stores);
+
   const { SalesItems: sales, status: salesStatus, error: salesError } =
     useSelector((state: RootState) => state.sales);
 
   useEffect(() => {
     dispatch(fetchStores());
     dispatch(fetchDashboardSales());
-  }, []);
+  }, [dispatch]);
 
   // --- compute net SC amount per store ---
   const netStoreAmounts = sales.reduce<Record<number, number>>((acc, sale) => {
     const { StoreCode, BillSeries, Amount } = sale;
+
     if (!acc[StoreCode]) acc[StoreCode] = 0;
 
-    if (BillSeries === 'SC') acc[StoreCode] += Amount;
-    if (BillSeries === 'LSR') acc[StoreCode] -= Amount; // subtract LSR
+    const amt = Number(Amount) || 0;   // <-- FIXED (ensure number)
+
+    if (BillSeries === 'SC') acc[StoreCode] += amt;
+    if (BillSeries === 'LSR') acc[StoreCode] -= Math.abs(amt); // subtract LSR safely
+
     return acc;
   }, {});
 
@@ -42,6 +47,7 @@ export default function StoresPage() {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
           {stores.map((store) => {
             const netAmount = netStoreAmounts[store.StoreCode] || 0;
+
             return (
               <div
                 key={store.StoreCode}

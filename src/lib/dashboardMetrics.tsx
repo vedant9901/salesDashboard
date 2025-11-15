@@ -1,6 +1,17 @@
 // /lib/dashboardMetrics.ts
 
-import { computeNetAmount, computeNetMTDRevenue, computeNetMTDQty, computeNetMTDBillCuts } from "@/lib/utils";
+import {
+  computeNetAmount,
+  computeNetMTDRevenue,
+  computeNetMTDQty,
+  computeNetMTDBillCuts,
+} from "@/lib/utils";
+
+/** Convert any value to a safe number */
+function safeNumber(value: any): number {
+  const num = Number(value);
+  return isNaN(num) ? 0 : num;
+}
 
 interface DashboardMetrics {
   totalNetAmount: number;
@@ -30,51 +41,74 @@ export function computeDashboardMetrics(
   selectedLMSales: any[] = [],
   selectedLYSales: any[] = [],
   selectedTargets: any[] = []
-) {
-  // Ensure arrays are defined
-  const yesterdaySales = selectedYesterday || [];
-  const overallSales = selectedOverall || [];
-  const lmSales = selectedLMSales || [];
-  const lySales = selectedLYSales || [];
-  const targets = selectedTargets || [];
+): DashboardMetrics {
+  // Safe arrays
+  const yesterdaySales = selectedYesterday ?? [];
+  const overallSales = selectedOverall ?? [];
+  const lmSales = selectedLMSales ?? [];
+  const lySales = selectedLYSales ?? [];
+  const targets = selectedTargets ?? [];
 
+  // Quantities
   const mtdQty = overallSales.reduce((sum, s) => sum + safeNumber(s.Qty), 0);
+  const lmQty = lmSales.reduce((sum, s) => sum + safeNumber(s.Qty), 0);
+  const lyQty = lySales.reduce((sum, s) => sum + safeNumber(s.Qty), 0);
+  const yesterdayQty = yesterdaySales.reduce(
+    (sum, s) => sum + safeNumber(s.Qty),
+    0
+  );
+
+  // Sales amounts
   const totalSalesVal = overallSales.reduce((sum, s) => sum + safeNumber(s.NetAmount), 0);
   const lmTotal = lmSales.reduce((sum, s) => sum + safeNumber(s.NetAmount), 0);
   const totalLy = lySales.reduce((sum, s) => sum + safeNumber(s.NetAmount), 0);
 
+  // Bills
   const yesterdayBills = yesterdaySales.reduce((sum, s) => sum + safeNumber(s.Bills), 0);
   const mtdBills = overallSales.reduce((sum, s) => sum + safeNumber(s.Bills), 0);
   const lmBills = lmSales.reduce((sum, s) => sum + safeNumber(s.Bills), 0);
   const lyBills = lySales.reduce((sum, s) => sum + safeNumber(s.Bills), 0);
 
-  const yesterdayIPT = yesterdayBills ? mtdQty / yesterdayBills : 0;
+  // IPT
+  const yesterdayIPT = yesterdayBills ? yesterdayQty / yesterdayBills : 0;
   const mtdIPT = mtdBills ? mtdQty / mtdBills : 0;
   const lmIPT = lmBills ? lmTotal / lmBills : 0;
   const lyIPT = lyBills ? totalLy / lyBills : 0;
 
-  const totalTargetVal = targets.reduce((sum, t) => sum + safeNumber(t.Target), 0);
-  const percentAchieved = totalTargetVal ? (totalSalesVal / totalTargetVal) * 100 : 0;
-  const mtdGrowth = lmTotal > 0 ? ((totalSalesVal - lmTotal) / lmTotal) * 100 : 0;
+  // Targets
+  const totalTargetVal = targets.reduce(
+    (sum, t) => sum + safeNumber(t.Target),
+    0
+  );
+
+  // Achieved % and Growth %
+  const percentAchieved = totalTargetVal
+    ? (totalSalesVal / totalTargetVal) * 100
+    : 0;
+
+  const mtdGrowth = lmTotal
+    ? ((totalSalesVal - lmTotal) / lmTotal) * 100
+    : 0;
 
   return {
     totalNetAmount: totalSalesVal,
+    yesterdayQty,
+    yesterdayBills,
+    yesterdayIPT,
     totalSalesVal,
-    totalTargetVal,
-    percentAchieved,
-    mtdGrowth,
     lmTotal,
     totalLy,
     mtdQty,
-    lyQty: lySales.reduce((sum, s) => sum + safeNumber(s.Qty), 0),
-    yesterdayIPT,
-    mtdIPT,
-    lmIPT,
-    lyIPT,
-    yesterdayBills,
+    lmQty,
+    lyQty,
     mtdBills,
     lmBills,
     lyBills,
+    mtdIPT,
+    lmIPT,
+    lyIPT,
+    totalTargetVal,
+    percentAchieved,
+    mtdGrowth,
   };
 }
-

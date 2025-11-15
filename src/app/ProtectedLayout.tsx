@@ -112,6 +112,23 @@ export default function ProtectedLayout({ children }: Props) {
     }
   }, [pathname, authChecked, isAuthenticated, userModules]);
 
+  /* FIRST ALLOWED MODULE ROUTE */
+function getFirstAllowedRoute(userModules: number[]): string {
+  for (const section of NAV_DATA) {
+    for (const item of section.items) {
+      if (item.moduleNumber && userModules.includes(item.moduleNumber)) {
+        return item.url ?? "/";
+      }
+      for (const sub of item.items || []) {
+        if (sub.moduleNumber && userModules.includes(sub.moduleNumber)) {
+          return sub.url ?? "/";
+        }
+      }
+    }
+  }
+  return "/"; // guaranteed fallback
+}
+
   return (
     <div className="flex min-h-screen">
       {isAuthenticated && !pathname.startsWith("/auth") && <Sidebar />}

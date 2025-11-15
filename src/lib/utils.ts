@@ -1,9 +1,28 @@
+// utils.ts
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
+
+// ---------------------- Unified Sales Record Type ----------------------
+export interface SalesRecord {
+  StoreCode: number;
+  StoreName?: string;
+  BillSeries: string;
+  Amount: number | string;
+  Quantity?: number;
+  TotalBills?: number;
+  Date?: string;
+  TotalSales?: number;
+}
+
+// Safe numeric conversion
+export const safeNumber = (v: any): number => {
+  const n = Number(String(v).replace(/,/g, ""));
+  return isNaN(n) ? 0 : n;
+};
 
 // ---------------------- Store Normalization ----------------------
 const nameToCodeMap: Record<string, number> = {
@@ -24,49 +43,13 @@ const nameToNameAndCodeMap: Record<string, [string, number]> = {
   "MAGSON - MCW": ["MCW BODAKDEV", 31],
 };
 
-// ---------------------- Safe Merge Function ----------------------
-export function mergeAndRemoveStore(
-  sales: { StoreCode: number; BillSeries: string; Amount: number | string }[],
-  mergeInto: number,
-  mergeFrom: number
-) {
-  if (!sales || !Array.isArray(sales)) return [];
-  return sales
-    .map((item) =>
-      item.StoreCode === mergeFrom
-        ? { ...item, StoreCode: mergeInto } // Merge into target store
-        : item
-    )
-    .filter((item) => item.StoreCode !== mergeFrom); // Remove merged store
-}
-
-export function applyMultiMerge(
-  sales: { StoreCode: number; BillSeries: string; Amount: number | string }[],
-  mergeRules: [from: number, into: number][] = [
-    [35, 8],
-    // [62, 30],
-  ]
-) {
-  let mergedSales = [...sales];
-  mergeRules.forEach(([from, into]) => {
-    // Create target store if it doesn't exist yet
-    if (!mergedSales.some((item) => item.StoreCode === into)) {
-      mergedSales.push({ StoreCode: into, BillSeries: "SC", Amount: 0 });
-    }
-    mergedSales = mergeAndRemoveStore(mergedSales, into, from);
-  });
-  return mergedSales;
-}
-
-// ---------------------- Normalize Store Names/Codes ----------------------
-export function normalizeSales(
-  sales: { StoreCode: number; StoreName: string; BillSeries: string; Amount: number | string }[]
-) {
+// ---------------------- Normalize Store Names & Codes ----------------------
+export function normalizeSales(sales: SalesRecord[]): SalesRecord[] {
   return sales.map((item) => {
-    if (nameToCodeMap[item.StoreName]) {
+    if (item.StoreName && nameToCodeMap[item.StoreName]) {
       return { ...item, StoreCode: nameToCodeMap[item.StoreName] };
     }
-    if (nameToNameAndCodeMap[item.StoreName]) {
+    if (item.StoreName && nameToNameAndCodeMap[item.StoreName]) {
       const [newName, newCode] = nameToNameAndCodeMap[item.StoreName];
       return { ...item, StoreName: newName, StoreCode: newCode };
     }
@@ -74,140 +57,149 @@ export function normalizeSales(
   });
 }
 
-// ---------------------- Compute Net Amount ----------------------
-export function computeNetAmount(
-  sales: { StoreCode: number; StoreName?: string; BillSeries: string; Amount: number | string }[],
-  storeCode?: number
-): number | Record<number, number> {
-  const totals: Record<number, { sc: number; lsr: number }> = {};
+// ---------------------- Merge Function ----------------------
+export function mergeAndRemoveStore(
+  sales: SalesRecord[],
+  mergeInto: number,
+  mergeFrom: number
+): SalesRecord[] {
+  return sales
+    .map((item) =>
+      item.StoreCode === mergeFrom
+        ? { ...item, StoreCode: mergeInto }
+        : item
+    )
+    .filter((item) => item.StoreCode !== mergeFrom);
+}
 
-  // 1️⃣ Normalize stores
-  const normalized = normalizeSales(sales);
+export function applyMultiMerge(
+  sales: SalesRecord[],
+  mergeRules: [from: number, into: number][] = [
+    [35, 8],
+    // [62, 30],
+  ]
+): SalesRecord[] {
+  let merged = [...sales];
 
-  // 2️⃣ Apply merges
-  const mergedSales = applyMultiMerge(normalized);
-
-  mergedSales.forEach(({ StoreCode, BillSeries, Amount }) => {
-    const amt = Number(String(Amount).replace(/,/g, "")) || 0;
-    const series = BillSeries?.trim().toUpperCase();
-
-    if (!totals[StoreCode]) totals[StoreCode] = { sc: 0, lsr: 0 };
-
-    // SC + B2B + WB + IS
-    if (["SC", "B2B", "WB", "IS"].includes(series)) totals[StoreCode].sc += amt;
-
-    // LSR subtraction
-    if (series === "LSR") totals[StoreCode].lsr += Math.abs(amt);
+  mergeRules.forEach(([from, into]) => {
+    if (!merged.some((s) => s.StoreCode === into)) {
+      merged.push({ StoreCode: into, BillSeries: "SC", Amount: 0 });
+    }
+    merged = mergeAndRemoveStore(merged, into, from);
   });
 
-  const netAmounts: Record<number, number> = {};
-  for (const code in totals) {
-    const { sc, lsr } = totals[code];
-    netAmounts[Number(code)] = sc - lsr;
-  }
+  return merged;
+}
 
-  if (storeCode !== undefined) return netAmounts[storeCode] || 0;
-  return netAmounts;
+// ---------------------- Compute Net Amount ----------------------
+export function computeNetAmount(
+  sales: SalesRecord[],
+  storeCode?: number
+): number | Record<number, number> {
+  const norms = normalizeSales(sales);
+  const merged = applyMultiMerge(norms);
+
+  const totals: Record<number, { sc: number; lsr: number }> = {};
+
+  merged.forEach((item) => {
+    const series = item.BillSeries?.toUpperCase();
+    const amt = safeNumber(item.Amount);
+
+    if (!totals[item.StoreCode]) totals[item.StoreCode] = { sc: 0, lsr: 0 };
+
+    if (["SC", "B2B", "WB", "IS"].includes(series)) totals[item.StoreCode].sc += amt;
+    if (series === "LSR") totals[item.StoreCode].lsr += Math.abs(amt);
+  });
+
+  const net: Record<number, number> = {};
+  Object.keys(totals).forEach((code) => {
+    const { sc, lsr } = totals[Number(code)];
+    net[Number(code)] = sc - lsr;
+  });
+
+  return storeCode !== undefined ? net[storeCode] ?? 0 : net;
 }
 
 // ---------------------- Compute Net MTD Revenue ----------------------
 export function computeNetMTDRevenue(
-  sales: { StoreCode: number; StoreName?: string; BillSeries: string; Amount: number | string }[],
+  sales: SalesRecord[],
   storeCode?: number
 ): number | Record<number, number> {
-  const normalized = normalizeSales(sales);
-  const mergedSales = applyMultiMerge(normalized);
+  const merged = applyMultiMerge(normalizeSales(sales));
 
   const totals: Record<number, { sc: number; lsr: number }> = {};
 
-  mergedSales.forEach(({ StoreCode, BillSeries, Amount , Quantity}) => {
-    const amt = Number(Amount) || 0;
-    const series = BillSeries?.trim().toUpperCase();
+  merged.forEach((item) => {
+    const series = item.BillSeries?.toUpperCase();
+    const amt = safeNumber(item.Amount);
 
-    if (!totals[StoreCode]) totals[StoreCode] = { scAmt: 0, lsrAmt: 0 };
+    if (!totals[item.StoreCode]) totals[item.StoreCode] = { sc: 0, lsr: 0 };
 
-    if (["SC", "B2B", "WB", "IS"].includes(series)) {
-      totals[StoreCode].scAmt += amt;
-    }
-    if (series === "LSR") {
-      totals[StoreCode].lsrAmt += Math.abs(amt);
-    }
+    if (["SC", "B2B", "WB", "IS"].includes(series)) totals[item.StoreCode].sc += amt;
+    if (series === "LSR") totals[item.StoreCode].lsr += Math.abs(amt);
   });
 
-  const netAmount: Record<number, number> = {};
-    console.log('called')
+  const net: Record<number, number> = {};
+  Object.keys(totals).forEach((code) => {
+    const { sc, lsr } = totals[Number(code)];
+    net[Number(code)] = sc - lsr;
+  });
 
-  for (const StoreCode in totals) {
-    const { scAmt, lsrAmt} = totals[StoreCode];
-    netAmount[Number(StoreCode)] = scAmt - lsrAmt;
-  }
-  return storeCode !== undefined ? netAmount[storeCode] || 0 : netAmount;
+  return storeCode !== undefined ? net[storeCode] ?? 0 : net;
 }
 
-// ---------------------- Compute Net MTD Revenue ----------------------
+// ---------------------- Compute Net MTD Qty ----------------------
 export function computeNetMTDQty(
-  sales: { StoreCode: number; StoreName?: string; BillSeries: string; Amount: number | string }[],
+  sales: SalesRecord[],
   storeCode?: number
 ): number | Record<number, number> {
-  const normalized = normalizeSales(sales);
-  const mergedSales = applyMultiMerge(normalized);
+  const merged = applyMultiMerge(normalizeSales(sales));
 
   const totals: Record<number, { sc: number; lsr: number }> = {};
 
-  mergedSales.forEach(({ StoreCode, BillSeries, Amount , Quantity}) => {
-    const series = BillSeries?.trim().toUpperCase();
-    const qty = Number(Quantity) || 0;
+  merged.forEach((item) => {
+    const series = item.BillSeries?.toUpperCase();
+    const qty = safeNumber(item.Quantity);
 
-    if (!totals[StoreCode]) totals[StoreCode] = { scQty: 0, lsrQty: 0 };
+    if (!totals[item.StoreCode]) totals[item.StoreCode] = { sc: 0, lsr: 0 };
 
-    if (["SC", "B2B", "WB", "IS"].includes(series)) {
-      totals[StoreCode].scQty += qty;
-    }
-    if (series === "LSR") {
-      totals[StoreCode].lsrQty += Math.abs(qty);
-    }
+    if (["SC", "B2B", "WB", "IS"].includes(series)) totals[item.StoreCode].sc += qty;
+    if (series === "LSR") totals[item.StoreCode].lsr += Math.abs(qty);
   });
 
-  const netQuantity: Record<number, number> = {};
+  const result: Record<number, number> = {};
+  Object.keys(totals).forEach((code) => {
+    result[Number(code)] = totals[Number(code)].sc;
+  });
 
-  for (const StoreCode in totals) {
-    const {  scQty, lsrQty } = totals[StoreCode];
-    netQuantity[Number(StoreCode)] = scQty;
-  }
-  return storeCode !== undefined ? netQuantity[storeCode] || 0 : netQuantity;
+  return storeCode !== undefined ? result[storeCode] ?? 0 : result;
 }
 
-// ---------------------- Compute Net MTD Revenue ----------------------
+// ---------------------- Compute MTD Bill Cuts ----------------------
 export function computeNetMTDBillCuts(
-  sales: { StoreCode: number; StoreName?: string; BillSeries: string; Amount: number | string }[],
+  sales: SalesRecord[],
   storeCode?: number
-): number | Record<number, number> {
-  const normalized = normalizeSales(sales);
-  const mergedSales = applyMultiMerge(normalized);
+) {
+  const merged = applyMultiMerge(normalizeSales(sales));
 
   const totals: Record<number, { sc: number; lsr: number }> = {};
 
-  mergedSales.forEach(({ StoreCode, BillSeries, Amount , Quantity,TotalBills}) => {
-    const series = BillSeries?.trim().toUpperCase();
-    const bills = Number(TotalBills) || 0;
+  merged.forEach((item) => {
+    const series = item.BillSeries?.toUpperCase();
+    const bills = safeNumber(item.TotalBills);
 
-    if (!totals[StoreCode]) totals[StoreCode] = { scbills: 0, lsrbills: 0 };
+    if (!totals[item.StoreCode]) totals[item.StoreCode] = { sc: 0, lsr: 0 };
 
-    if (["SC", "B2B", "WB", "IS"].includes(series)) {
-      totals[StoreCode].scbills += bills;
-    }
-    if (series === "LSR") {
-      totals[StoreCode].lsrbills += Math.abs(bills);
-    }
+    if (["SC", "B2B", "WB", "IS"].includes(series)) totals[item.StoreCode].sc += bills;
+    if (series === "LSR") totals[item.StoreCode].lsr += Math.abs(bills);
   });
 
-  const netbills: Record<number, number> = {};
+  const result: Record<number, number> = {};
+  Object.keys(totals).forEach((code) => {
+    result[Number(code)] = totals[Number(code)].sc;
+  });
 
-  for (const StoreCode in totals) {
-    const {  scbills, lsrbills } = totals[StoreCode];
-    netbills[Number(StoreCode)] = scbills;
-  }
-  return storeCode !== undefined ? netbills[storeCode] || 0 : netbills;
+  return storeCode !== undefined ? result[storeCode] ?? 0 : result;
 }
 
 // ---------------------- Unique By ----------------------
@@ -226,12 +218,11 @@ export function standardFormat(num: number) {
   return Math.round(num).toLocaleString("en-IN");
 }
 
-
 export function compactFormat(num: number) {
   return num.toLocaleString("en-IN", { notation: "compact" });
 }
 
-// ---------------------- Date Formatting ----------------------
+// ---------------------- Date Helpers ----------------------
 export const formatLocalDate = (d: Date) => {
   const month = (d.getMonth() + 1).toString().padStart(2, "0");
   const day = d.getDate().toString().padStart(2, "0");
@@ -239,62 +230,55 @@ export const formatLocalDate = (d: Date) => {
 };
 
 export const getLast13Months = () => {
-  const months: { label: string; start: string; end: string }[] = [];
+  const list: { label: string; start: string; end: string }[] = [];
   const today = new Date();
   for (let i = 12; i >= 0; i--) {
     const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
-    const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
-    const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0); // last day
-    months.push({
+    const start = new Date(date.getFullYear(), date.getMonth(), 1);
+    const end = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+
+    list.push({
       label: date.toLocaleString("default", { month: "short", year: "numeric" }),
-      start: formatLocalDate(monthStart),
-      end: formatLocalDate(monthEnd),
+      start: formatLocalDate(start),
+      end: formatLocalDate(end),
     });
   }
-  return months;
+  return list;
 };
 
-
-// utils/sales.ts
+// ---------------------- Sales Computation ----------------------
 export const computeMonthlySales = (
-  salesData: any[],
+  salesData: SalesRecord[],
   months: { start: string; end: string; label?: string }[]
 ) => {
   return months.map((m) => {
-    const monthlySales = salesData
-      .filter((s) => s.Date >= m.start && s.Date <= m.end)
-      .reduce((sum, s) => sum + (s.TotalSales || 0), 0);
+    const monthly = salesData
+      .filter((s) => s.Date && s.Date >= m.start && s.Date <= m.end)
+      .reduce((sum, s) => sum + safeNumber(s.TotalSales), 0);
 
-    return {
-      month: m.label,
-      totalSales: monthlySales,
-    };
+    return { month: m.label, totalSales: monthly };
   });
 };
 
-/**
- * Returns a Tailwind CSS class based on RGM (%) value.
- * @param rgm - RGM percentage
- * @returns Tailwind class string
- */
-export const getRGMColor = (rgm: number): string => {
-  if (rgm < 20) return 'text-red-600 font-bold';
-  if (rgm < 40) return 'text-yellow-600 font-semibold';
-  return 'text-green-600 font-semibold';
+// ---------------------- Color Helpers ----------------------
+export const getRGMColor = (rgm: number) => {
+  if (rgm < 20) return "text-red-600 font-bold";
+  if (rgm < 40) return "text-yellow-600 font-semibold";
+  return "text-green-600 font-semibold";
 };
 
-
-export const getPieData = (dept: any) => {
-  return dept.SubClasses?.map((sub: any) => ({
+export const getPieData = (dept: any) =>
+  dept.SubClasses?.map((sub: any) => ({
     name: sub.SubClass,
     value: sub.RGM,
     lastMonth: sub.LastMonthRGM ?? 0,
   })) ?? [];
-};
 
-export const formatMonthName = (monthStr) => {
-    if (!monthStr) return "";
-    const [year, month] = monthStr.split("-");
-    const date = new Date(Number(year), Number(month) - 1);
-    return date.toLocaleString("en-US", { month: "long", year: "numeric" });
-  };
+export const formatMonthName = (monthStr: string) => {
+  if (!monthStr) return "";
+  const [year, month] = monthStr.split("-");
+  return new Date(Number(year), Number(month) - 1).toLocaleString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+};

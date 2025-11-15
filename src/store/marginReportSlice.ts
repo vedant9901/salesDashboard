@@ -35,7 +35,21 @@ export interface MarginReportItem {
   GrossAmount: number;
   GrossMarginAmount: number;
   RGM: number;
+
+  /** Last Month */
+  LastMonthTotalQty?: number;
+  LastMonthTotalAmount?: number;
+  LastMonthGrossMargin?: number;
+
+  /** Last Year */
+  LastYearTotalQty?: number;
+  LastYearTotalAmount?: number;
+  LastYearGrossMargin?: number;
+
+  /** Subclasses (if present) */
+  SubClasses?: MarginReportItem[];
 }
+
 
 export interface MarginReportState {
   items: MarginReportItem[];

@@ -180,3 +180,31 @@ export function RupeeIcon(props: PropsType) {
   );
 }
 
+
+export function CalendarIcon(props: PropsType) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      {...props}
+    >
+      <path d="M7 2a1 1 0 110 2h10a1 1 0 110-2h2a2 2 0 012 2v15a2 2 0 01-2 2H5a2 2 0 01-2-2V4a2 2 0 012-2h2zM5 8v11h14V8H5zm3-3a1 1 0 100-2H6a1 1 0 100 2h2zm10 0a1 1 0 100-2h-2a1 1 0 100 2h2z" />
+    </svg>
+  );
+}
+
+export function ArrowLeftIcon(props: PropsType) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      {...props}
+    >
+      <path
+        fillRule="evenodd"
+        d="M12.78 3.22a.75.75 0 010 1.06L7.56 9.5H17a.75.75 0 010 1.5H7.56l5.22 5.22a.75.75 0 11-1.06 1.06l-6.5-6.5a.75.75 0 010-1.06l6.5-6.5a.75.75 0 011.06 0z"
+        clipRule="evenodd"
+      />
+    </svg>
+  );
+}
