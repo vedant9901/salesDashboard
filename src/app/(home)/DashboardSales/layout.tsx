@@ -1,7 +1,7 @@
 // app/layout.tsx
 import "@/css/satoshi.css";
 import "@/css/style.css";
-import { Providers } from "../providers"; // your Redux / Theme providers etc.
+import { Providers } from "../../providers"; // your Redux / Theme providers etc.
 
 export const metadata = {
   title: "Magson",
