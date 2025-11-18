@@ -1,7 +1,7 @@
 "use client";
 
-import "@/css/satoshi.css";
-import "@/css/style.css";
+// import "@/css/satoshi.css";
+// import "@/css/style.css";
 import { PropsWithChildren, useEffect } from "react";
 import { useRouter } from "next/navigation";
 

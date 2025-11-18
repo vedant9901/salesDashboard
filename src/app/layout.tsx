@@ -1,4 +1,5 @@
-// import "./globals.css";
+import "@/css/satoshi.css";
+import "@/css/style.css";
 import { Providers } from "./providers";
 
 export const metadata = {

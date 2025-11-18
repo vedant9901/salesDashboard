@@ -230,11 +230,6 @@ export default function CategoryClassificationReport({
     <div className="p-3 md:p-5 space-y-5">
       {/* header + cards */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900">ABC Classification Report</h2>
-          <div className="text-xs text-gray-500">Store <span className="font-medium">{storeCode}</span> • {startDate} → {endDate}</div>
-        </div>
-
         {/* category cards */}
         <div className="flex gap-3 items-stretch w-full md:w-auto">
           <SummaryCard title="Category A" data={category_summary?.A} color="bg-red-100 text-red-700" />
